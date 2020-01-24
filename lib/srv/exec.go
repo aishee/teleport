@@ -27,7 +27,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"os/user"
+	//"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -59,29 +59,15 @@ const (
 // execCommand contains the payload to "teleport exec" will will be used to
 // construct and execute a exec.Cmd.
 type execCommand struct {
-	// Path the the full path to the binary to execute.
-	Path string `json:"path"`
+	Command string `json:"command"`
 
-	// Args is the list of arguments to pass to the command.
-	Args []string `json:"args"`
+	Username string `json:"username"`
 
-	// Env is a list of environment variables to pass to the command.
-	Env []string `json:"env"`
+	Login string `json:"login"`
 
-	// Dir is the working/home directory of the command.
-	Dir string `json:"dir"`
+	Roles []string `json:"roles"`
 
-	// Uid is the UID under which to spawn the command.
-	Uid uint32 `json:"uid"`
-
-	// Gid it the GID under which to spawn the command.
-	Gid uint32 `json:"gid"`
-
-	// Groups is the list of supplementary groups.
-	Groups []uint32 `json:"groups"`
-
-	// SetCreds controls if the process credentials will be set.
-	SetCreds bool `json:"set_creds"`
+	ClusterName string `json:"cluster_name"`
 
 	// Terminal is if a TTY has been allocated for the session.
 	Terminal bool `json:"term"`
@@ -89,21 +75,63 @@ type execCommand struct {
 	// RequestType is the type of request: either "exec" or "shell".
 	RequestType string `json:"request_type"`
 
-	// PAM contains metadata needed to launch a PAM context.
-	PAM *pamCommand `json:"pam"`
+	ProxyPublicAddr string `json:"proxy_public_addr"`
+
+	ServerID string `json:"server_id"`
+
+	AdditionalEnvironment []string `json:"additional_environment"`
+
+	//// Path the the full path to the binary to execute.
+	//Path string `json:"path"`
+
+	//// Args is the list of arguments to pass to the command.
+	//Args []string `json:"args"`
+
+	//// Env is a list of environment variables to pass to the command.
+	//Env []string `json:"env"`
+
+	//// Dir is the working/home directory of the command.
+	//Dir string `json:"dir"`
+
+	//// Uid is the UID under which to spawn the command.
+	//Uid uint32 `json:"uid"`
+
+	//// Gid it the GID under which to spawn the command.
+	//Gid uint32 `json:"gid"`
+
+	//// Groups is the list of supplementary groups.
+	//Groups []uint32 `json:"groups"`
+
+	//// SetCreds controls if the process credentials will be set.
+	//SetCreds bool `json:"set_creds"`
+
+	//// Terminal is if a TTY has been allocated for the session.
+	//Terminal bool `json:"term"`
+
+	//// RequestType is the type of request: either "exec" or "shell".
+	//RequestType string `json:"request_type"`
+
+	//// PAM contains metadata needed to launch a PAM context.
+	//PAM *pamCommand `json:"pam"`
 }
 
-// pamCommand contains the payload to launch a PAM context.
-type pamCommand struct {
-	// Enabled indicates that PAM has been enabled on this host.
-	Enabled bool `json:"enabled"`
-
-	// ServiceName is the name service whose policy will be loaded.
-	ServiceName string `json:"service_name"`
-
-	// Username is the host login.
-	Username string `json:"username"`
-}
+//// pamCommand contains the payload to launch a PAM context.
+//type pamCommand struct {
+//	// Enabled indicates that PAM has been enabled on this host.
+//	Enabled bool `json:"enabled"`
+//
+//	// ServiceName is the name service whose policy will be loaded.
+//	ServiceName string `json:"service_name"`
+//
+//	// Username is the Teleport user.
+//	Username string `json:"username"`
+//
+//	// Login is the host login.
+//	Login string `json:"login"`
+//
+//	// Roles is the list of roles assigned to this user.
+//	Roles []string `json:"roles"`
+//}
 
 // ExecResult is used internally to send the result of a command execution from
 // a goroutine to SSH request handler and back to the calling client
@@ -288,6 +316,8 @@ func (e *localExec) String() string {
 // RunCommand reads in the command to run from the parent process (over a
 // pipe) then constructs and runs the command.
 func RunCommand() {
+	ioutil.WriteFile("/tmp/debug.1", []byte("--> Enter."), 0644)
+
 	// errorWriter is used to return any error message back to the client. By
 	// default it writes to stdout, but if a TTY is allocated, it will write
 	// to it.
@@ -392,10 +422,15 @@ func RunCommand() {
 		// Open the PAM context.
 		pamContext, err = pam.Open(&pam.Config{
 			ServiceName: c.PAM.ServiceName,
-			Username:    c.PAM.Username,
-			Stdin:       stdin,
-			Stdout:      stdout,
-			Stderr:      stderr,
+			//Username:    c.PAM.Username,
+			LoginContext: &pam.LoginContextV1{
+				Username: c.PAM.Username,
+				Login:    c.PAM.Login,
+				Roles:    c.PAM.Roles,
+			},
+			Stdin:  stdin,
+			Stdout: stdout,
+			Stderr: stderr,
 		})
 		if err != nil {
 			errorAndExit(errorWriter, teleport.RemoteCommandFailure, err)
@@ -500,43 +535,44 @@ func prepareCommand(ctx *ServerContext) (*execCommand, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	// Lookup the UID and GID for the user.
-	osUser, err := user.Lookup(ctx.Identity.Login)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	uid, err := strconv.Atoi(osUser.Uid)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	c.Uid = uint32(uid)
-	gid, err := strconv.Atoi(osUser.Gid)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	c.Gid = uint32(gid)
+	//// Lookup the UID and GID for the user.
+	//osUser, err := user.Lookup(ctx.Identity.Login)
+	//if err != nil {
+	//	return nil, trace.Wrap(err)
+	//}
+	//uid, err := strconv.Atoi(osUser.Uid)
+	//if err != nil {
+	//	return nil, trace.Wrap(err)
+	//}
+	//c.Uid = uint32(uid)
+	//gid, err := strconv.Atoi(osUser.Gid)
+	//if err != nil {
+	//	return nil, trace.Wrap(err)
+	//}
+	//c.Gid = uint32(gid)
 
 	// Set the home directory for the user.
-	c.Dir = osUser.HomeDir
+	//c.Dir = osUser.HomeDir
+	c.Dir = "/home/rjones"
 
-	// Lookup supplementary groups for the user.
-	userGroups, err := osUser.GroupIds()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	groups := make([]uint32, 0)
-	for _, sgid := range userGroups {
-		igid, err := strconv.Atoi(sgid)
-		if err != nil {
-			log.Warnf("Cannot interpret user group: '%v'", sgid)
-		} else {
-			groups = append(groups, uint32(igid))
-		}
-	}
-	if len(groups) == 0 {
-		groups = append(groups, uint32(gid))
-	}
-	c.Groups = groups
+	//// Lookup supplementary groups for the user.
+	//userGroups, err := osUser.GroupIds()
+	//if err != nil {
+	//	return nil, trace.Wrap(err)
+	//}
+	//groups := make([]uint32, 0)
+	//for _, sgid := range userGroups {
+	//	igid, err := strconv.Atoi(sgid)
+	//	if err != nil {
+	//		log.Warnf("Cannot interpret user group: '%v'", sgid)
+	//	} else {
+	//		groups = append(groups, uint32(igid))
+	//	}
+	//}
+	//if len(groups) == 0 {
+	//	groups = append(groups, uint32(gid))
+	//}
+	//c.Groups = groups
 
 	// Only set process credentials if the UID/GID of the requesting user are
 	// different than the process (Teleport).
@@ -549,20 +585,21 @@ func prepareCommand(ctx *ServerContext) (*execCommand, error) {
 	// workaround this, the credentials struct is only set if the credentials
 	// are different from the process itself. If the credentials are not, simply
 	// pick up the ambient credentials of the process.
-	if strconv.Itoa(os.Getuid()) != osUser.Uid || strconv.Itoa(os.Getgid()) != osUser.Gid {
-		c.SetCreds = true
-		log.Debugf("Creating process with UID %v, GID: %v, and Groups: %v.",
-			uid, gid, groups)
-	} else {
-		log.Debugf("Credential process with ambient credentials UID %v, GID: %v, Groups: %v.",
-			uid, gid, groups)
-	}
+	//if strconv.Itoa(os.Getuid()) != osUser.Uid || strconv.Itoa(os.Getgid()) != osUser.Gid {
+	//	c.SetCreds = true
+	//	log.Debugf("Creating process with UID %v, GID: %v, and Groups: %v.",
+	//		uid, gid, groups)
+	//} else {
+	//	log.Debugf("Credential process with ambient credentials UID %v, GID: %v, Groups: %v.",
+	//		uid, gid, groups)
+	//}
 
 	// Create environment for user.
 	c.Env = []string{
 		"LANG=en_US.UTF-8",
-		getDefaultEnvPath(osUser.Uid, defaultLoginDefsPath),
-		"HOME=" + osUser.HomeDir,
+		//getDefaultEnvPath(osUser.Uid, defaultLoginDefsPath),
+		//"HOME=" + osUser.HomeDir,
+		"HOME=/home/rjones",
 		"USER=" + ctx.Identity.Login,
 		"SHELL=" + shellPath,
 		teleport.SSHTeleportUser + "=" + ctx.Identity.TeleportUser,
@@ -615,20 +652,22 @@ func prepareCommand(ctx *ServerContext) (*execCommand, error) {
 		c.PAM = &pamCommand{
 			Enabled:     conf.Enabled,
 			ServiceName: conf.ServiceName,
-			Username:    ctx.Identity.Login,
+			Username:    ctx.Identity.TeleportUser,
+			Login:       ctx.Identity.Login,
+			Roles:       ctx.Identity.RoleSet.RoleNames(),
 		}
 	}
 
-	// If the server allows reading in of ~/.tsh/environment read it in
-	// and pass environment variables along to new session.
-	if ctx.srv.PermitUserEnvironment() {
-		filename := filepath.Join(osUser.HomeDir, ".tsh", "environment")
-		userEnvs, err := utils.ReadEnvironmentFile(filename)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		c.Env = append(c.Env, userEnvs...)
-	}
+	//// If the server allows reading in of ~/.tsh/environment read it in
+	//// and pass environment variables along to new session.
+	//if ctx.srv.PermitUserEnvironment() {
+	//	filename := filepath.Join(osUser.HomeDir, ".tsh", "environment")
+	//	userEnvs, err := utils.ReadEnvironmentFile(filename)
+	//	if err != nil {
+	//		return nil, trace.Wrap(err)
+	//	}
+	//	c.Env = append(c.Env, userEnvs...)
+	//}
 
 	return &c, nil
 }
@@ -637,11 +676,29 @@ func prepareCommand(ctx *ServerContext) (*execCommand, error) {
 func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
 	var err error
 
-	// Create and marshal command to execute.
-	cmdmsg, err := prepareCommand(ctx)
+	clusterName, err := ctx.srv.GetAccessPoint().GetClusterName()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+
+	// Create and marshal command to execute.
+	cmdmsg := &execCommand{
+		Command:     ctx.ExecRequest.GetCommand(),
+		Username:    ctx.Identity.TeleportUser,
+		Login:       ctx.Identity.Login,
+		Roles:       ctx.Identity.RoleSet.RoleNames(),
+		ClusterName: clusterConfig,
+		//Terminal
+		//RequestType
+		//ProxyPublicAddr
+		//ServerID
+		//AdditionalEnvironment
+	}
+	// Create and marshal command to execute.
+	//cmdmsg, err := prepareCommand(ctx)
+	//if err != nil {
+	//	return nil, trace.Wrap(err)
+	//}
 	cmdbytes, err := json.Marshal(cmdmsg)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -660,12 +717,12 @@ func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
 	// Set to nil so the close in the context doesn't attempt to re-close.
 	ctx.cmdw = nil
 
-	// Re-execute Teleport and pass along the allocated PTY as well as the
-	// command reader from where Teleport will know how to re-spawn itself.
+	// Find the Teleport executable and it's directory on disk.
 	executable, err := os.Executable()
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	executableDir, _ := filepath.Split(executable)
 
 	// Build the list of arguments to have Teleport re-exec itself. The "-d" flag
 	// is appended if Teleport is running in debug mode.
@@ -675,7 +732,7 @@ func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
 	return &exec.Cmd{
 		Path: executable,
 		Args: args,
-		Dir:  cmdmsg.Dir,
+		Dir:  executableDir,
 		ExtraFiles: []*os.File{
 			ctx.cmdr,
 			ctx.contr,
