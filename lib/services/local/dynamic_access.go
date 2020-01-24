@@ -196,11 +196,16 @@ func (s *DynamicAccessService) UpsertAccessRequest(ctx context.Context, req serv
 
 // GetPluginData loads all plugin data matching the supplied filter.
 func (s *DynamicAccessService) GetPluginData(ctx context.Context, filter services.PluginDataFilter) ([]services.PluginData, error) {
-	data, err := s.getAccessRequestPluginData(ctx, filter)
-	if err != nil {
-		return nil, trace.Wrap(err)
+	switch filter.Kind {
+	case services.KindAccessRequest:
+		data, err := s.getAccessRequestPluginData(ctx, filter)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return data, nil
+	default:
+		return nil, trace.BadParameter("unsupported resource kind %q", filter.Kind)
 	}
-	return data, nil
 }
 
 func (s *DynamicAccessService) getAccessRequestPluginData(ctx context.Context, filter services.PluginDataFilter) ([]services.PluginData, error) {
@@ -249,7 +254,12 @@ func (s *DynamicAccessService) getAccessRequestPluginData(ctx context.Context, f
 
 // UpdatePluginData updates a per-resource PluginData entry.
 func (s *DynamicAccessService) UpdatePluginData(ctx context.Context, params services.PluginDataUpdateParams) error {
-	return trace.Wrap(s.updateAccessRequestPluginData(ctx, params))
+	switch params.Kind {
+	case services.KindAccessRequest:
+		return trace.Wrap(s.updateAccessRequestPluginData(ctx, params))
+	default:
+		return trace.BadParameter("unsupported resource kind %q", params.Kind)
+	}
 }
 
 func (s *DynamicAccessService) updateAccessRequestPluginData(ctx context.Context, params services.PluginDataUpdateParams) error {
@@ -285,7 +295,7 @@ func (s *DynamicAccessService) updateAccessRequestPluginData(ctx context.Context
 			if err != nil {
 				return trace.Wrap(err)
 			}
-			data, err = services.NewPluginData(params.Resource)
+			data, err = services.NewPluginData(params.Resource, services.KindAccessRequest)
 			if err != nil {
 				return trace.Wrap(err)
 			}

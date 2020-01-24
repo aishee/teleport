@@ -59,11 +59,12 @@ func (s *AccessRequestSuite) TestRequestMarshaling(c *C) {
 func (s *AccessRequestSuite) TestPluginDataExpectations(c *C) {
 	const rname = "my-resource"
 	const pname = "my-plugin"
-	data, err := NewPluginData(rname)
+	data, err := NewPluginData(rname, KindAccessRequest)
 	c.Assert(err, IsNil)
 
 	// Set two keys, expecting them to be unset.
 	err = data.Update(PluginDataUpdateParams{
+		Kind:     KindAccessRequest,
 		Resource: rname,
 		Plugin:   pname,
 		Set: map[string]string{
@@ -79,6 +80,7 @@ func (s *AccessRequestSuite) TestPluginDataExpectations(c *C) {
 
 	// Expect a value which does not exist.
 	err = data.Update(PluginDataUpdateParams{
+		Kind:     KindAccessRequest,
 		Resource: rname,
 		Plugin:   pname,
 		Set: map[string]string{
@@ -92,6 +94,7 @@ func (s *AccessRequestSuite) TestPluginDataExpectations(c *C) {
 
 	// Expect a value to not exist when it does exist.
 	err = data.Update(PluginDataUpdateParams{
+		Kind:     KindAccessRequest,
 		Resource: rname,
 		Plugin:   pname,
 		Set: map[string]string{
@@ -106,6 +109,7 @@ func (s *AccessRequestSuite) TestPluginDataExpectations(c *C) {
 
 	// Expect the correct state, updating one key and removing another.
 	err = data.Update(PluginDataUpdateParams{
+		Kind:     KindAccessRequest,
 		Resource: rname,
 		Plugin:   pname,
 		Set: map[string]string{
@@ -121,6 +125,7 @@ func (s *AccessRequestSuite) TestPluginDataExpectations(c *C) {
 
 	// Expect the new updated state.
 	err = data.Update(PluginDataUpdateParams{
+		Kind:     KindAccessRequest,
 		Resource: rname,
 		Plugin:   pname,
 		Set: map[string]string{
@@ -138,7 +143,7 @@ func (s *AccessRequestSuite) TestPluginDataExpectations(c *C) {
 func (s *AccessRequestSuite) TestPluginDataFilterMatching(c *C) {
 	const rname = "my-resource"
 	const pname = "my-plugin"
-	data, err := NewPluginData(rname)
+	data, err := NewPluginData(rname, KindAccessRequest)
 	c.Assert(err, IsNil)
 
 	var f PluginDataFilter
@@ -157,6 +162,7 @@ func (s *AccessRequestSuite) TestPluginDataFilterMatching(c *C) {
 
 	// Add some data
 	err = data.Update(PluginDataUpdateParams{
+		Kind:     KindAccessRequest,
 		Resource: rname,
 		Plugin:   pname,
 		Set: map[string]string{

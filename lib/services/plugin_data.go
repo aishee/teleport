@@ -57,15 +57,15 @@ func (d *PluginDataV3) CheckAndSetDefaults() error {
 // NewPluginData configures a new PluginData instance associated
 // with the supplied resource name (currently, this must be the
 // name of an access request).
-func NewPluginData(resource string) (PluginData, error) {
+func NewPluginData(resourceName string, resourceKind string) (PluginData, error) {
 	data := PluginDataV3{
 		Kind:    KindPluginData,
 		Version: V3,
 		// If additional resource kinds become supported, make
 		// this a parameter.
-		SubKind: KindAccessRequest,
+		SubKind: resourceKind,
 		Metadata: Metadata{
-			Name: resource,
+			Name: resourceName,
 		},
 		Spec: PluginDataSpecV3{
 			Entries: make(map[string]*PluginDataEntry),
@@ -86,6 +86,14 @@ func (d *PluginDataV3) Entries() map[string]*PluginDataEntry {
 
 func (d *PluginDataV3) Update(params PluginDataUpdateParams) error {
 	// See #3286 for a complete discussion of the design constraints at play here.
+
+	if params.Kind != d.GetSubKind() {
+		return trace.BadParameter("resource kind mismatch in update params")
+	}
+
+	if params.Resource != d.GetName() {
+		return trace.BadParameter("resource name mismatch in update params")
+	}
 
 	// If expectations were given, ensure that they are met before continuing
 	if params.Expect != nil {
@@ -149,6 +157,9 @@ func (d *PluginDataV3) checkExpectations(plugin string, expect map[string]string
 }
 
 func (f *PluginDataFilter) Match(data PluginData) bool {
+	if f.Kind != "" && f.Kind != data.GetSubKind() {
+		return false
+	}
 	if f.Resource != "" && f.Resource != data.GetName() {
 		return false
 	}
