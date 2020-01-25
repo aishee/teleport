@@ -57,91 +57,50 @@ const (
 )
 
 // execCommand contains the payload to "teleport exec" will will be used to
-// construct and execute a exec.Cmd.
+// construct and execute a shell.
 type execCommand struct {
+	// Command is the command to execute. If a interactive session is being
+	// requested, will be empty.
 	Command string `json:"command"`
 
+	// Username is the username associated with the Teleport identity.
 	Username string `json:"username"`
 
+	// Login is the local *nix account.
 	Login string `json:"login"`
 
+	// Roles is the list of Teleport roles assigned to the Teleport identity.
 	Roles []string `json:"roles"`
 
+	// ClusterName is the name of the Teleport cluster.
 	ClusterName string `json:"cluster_name"`
 
-	// Terminal is if a TTY has been allocated for the session.
+	// Terminal indicates if a TTY has been allocated for the session. This is
+	// typically set if either an shell was requested or a TTY was explicitly
+	// allocated for a exec request.
 	Terminal bool `json:"term"`
 
-	// RequestType is the type of request: either "exec" or "shell".
+	// RequestType is the type of request: either "exec" or "shell". This will
+	// be used to control where to connect std{out,err} based on the request
+	// type: "exec" or "shell".
 	RequestType string `json:"request_type"`
 
+	// PAM indicates if PAM support was requested by the node.
 	PAM bool `json:"pam"`
 
+	// ServiceName is the name of the PAM service requested if PAM is enabled.
 	ServiceName string `json:"service_name"`
 
-	ProxyPublicAddr string `json:"proxy_public_addr"`
-
-	ServerID string `json:"server_id"`
-
-	AdditionalEnvironment []string `json:"additional_environment"`
-
-	IsTestStub bool `json:"is_test_stub"`
-
+	// Environment is a list of environment variables to add to the defaults.
 	Environment []string `json:"environment"`
 
+	// PermitUserEnvironment is set to allow reading in ~/.tsh/environment
+	// upon login.
 	PermitUserEnvironment bool `json:"permit_user_environment"`
 
-	//// Path the the full path to the binary to execute.
-	//Path string `json:"path"`
-
-	//// Args is the list of arguments to pass to the command.
-	//Args []string `json:"args"`
-
-	//// Env is a list of environment variables to pass to the command.
-	//Env []string `json:"env"`
-
-	//// Dir is the working/home directory of the command.
-	//Dir string `json:"dir"`
-
-	//// Uid is the UID under which to spawn the command.
-	//Uid uint32 `json:"uid"`
-
-	//// Gid it the GID under which to spawn the command.
-	//Gid uint32 `json:"gid"`
-
-	//// Groups is the list of supplementary groups.
-	//Groups []uint32 `json:"groups"`
-
-	//// SetCreds controls if the process credentials will be set.
-	//SetCreds bool `json:"set_creds"`
-
-	//// Terminal is if a TTY has been allocated for the session.
-	//Terminal bool `json:"term"`
-
-	//// RequestType is the type of request: either "exec" or "shell".
-	//RequestType string `json:"request_type"`
-
-	//// PAM contains metadata needed to launch a PAM context.
-	//PAM *pamCommand `json:"pam"`
+	// IsTestStub is used by tests to mock the shell.
+	IsTestStub bool `json:"is_test_stub"`
 }
-
-//// pamCommand contains the payload to launch a PAM context.
-//type pamCommand struct {
-//	// Enabled indicates that PAM has been enabled on this host.
-//	Enabled bool `json:"enabled"`
-//
-//	// ServiceName is the name service whose policy will be loaded.
-//	ServiceName string `json:"service_name"`
-//
-//	// Username is the Teleport user.
-//	Username string `json:"username"`
-//
-//	// Login is the host login.
-//	Login string `json:"login"`
-//
-//	// Roles is the list of roles assigned to this user.
-//	Roles []string `json:"roles"`
-//}
 
 // ExecResult is used internally to send the result of a command execution from
 // a goroutine to SSH request handler and back to the calling client
@@ -369,9 +328,8 @@ func RunCommand() {
 	}
 
 	// If PAM is enabled, open a PAM context. This has to be done before anything
-	// else because PAM is sometimes used to create the local user that will be
-	// used to launch the shell under.
-	//var pamContext *pam.PAM
+	// else because PAM is sometimes used to create the local user used to
+	// launch the shell under.
 	var pamEnvironment []string
 	if c.PAM {
 		// Connect std{in,out,err} to the TTY if it's a shell request, otherwise
@@ -468,6 +426,80 @@ func (e *localExec) transformSecureCopy() error {
 	return nil
 }
 
+// configureCommand creates a command fully configured to execute. This
+// function is used by Teleport to re-execute itself and pass whatever data
+// is need to the child to actually execute the shell.
+func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
+	var err error
+	var pamEnabled bool
+	var pamServiceName string
+
+	// If this code is running on a node, check if PAM is enabled or not.
+	if ctx.srv.Component() == teleport.ComponentNode {
+		conf, err := ctx.srv.GetPAM()
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		pamEnabled = conf.Enabled
+		pamServiceName = conf.ServiceName
+	}
+
+	// Create and marshal command to execute.
+	cmdmsg := &execCommand{
+		Command:               ctx.ExecRequest.GetCommand(),
+		Username:              ctx.Identity.TeleportUser,
+		Login:                 ctx.Identity.Login,
+		Roles:                 ctx.Identity.RoleSet.RoleNames(),
+		Terminal:              ctx.termAllocated || ctx.ExecRequest.GetCommand() == "",
+		RequestType:           ctx.request.Type,
+		PermitUserEnvironment: ctx.srv.PermitUserEnvironment(),
+		Environment:           buildEnvironment(ctx),
+		PAM:                   pamEnabled,
+		ServiceName:           pamServiceName,
+	}
+	cmdbytes, err := json.Marshal(cmdmsg)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	// Write command bytes to pipe. The child process will read the command
+	// to execute from this pipe.
+	_, err = io.Copy(ctx.cmdw, bytes.NewReader(cmdbytes))
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	err = ctx.cmdw.Close()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	// Set to nil so the close in the context doesn't attempt to re-close.
+	ctx.cmdw = nil
+
+	// Find the Teleport executable and it's directory on disk.
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	executableDir, _ := filepath.Split(executable)
+
+	// Build the list of arguments to have Teleport re-exec itself. The "-d" flag
+	// is appended if Teleport is running in debug mode.
+	args := []string{executable, teleport.ExecSubCommand}
+
+	// Build the "teleport exec" command.
+	return &exec.Cmd{
+		Path: executable,
+		Args: args,
+		Dir:  executableDir,
+		ExtraFiles: []*os.File{
+			ctx.cmdr,
+			ctx.contr,
+		},
+	}, nil
+}
+
+// buildCommand construct a command that will execute the users shell. This
+// function is run by Teleport while it's re-executing.
 func buildCommand(c *execCommand, tty *os.File, pty *os.File, pamEnvironment []string) (*exec.Cmd, error) {
 	var cmd exec.Cmd
 
@@ -609,6 +641,8 @@ func buildCommand(c *execCommand, tty *os.File, pty *os.File, pamEnvironment []s
 	return &cmd, nil
 }
 
+// buildEnvironment constructs a list of environment variables from
+// cluster information.
 func buildEnvironment(ctx *ServerContext) []string {
 	var env []string
 
@@ -653,84 +687,6 @@ func buildEnvironment(ctx *ServerContext) []string {
 	env = append(env, teleport.SSHTeleportUser+"="+ctx.Identity.TeleportUser)
 
 	return env
-}
-
-// configureCommand creates a command fully configured to execute.
-func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
-	var err error
-	var pamEnabled bool
-	var pamServiceName string
-
-	// If this code is running on a node, check if PAM is enabled or not.
-	if ctx.srv.Component() == teleport.ComponentNode {
-		conf, err := ctx.srv.GetPAM()
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		pamEnabled = conf.Enabled
-		pamServiceName = conf.ServiceName
-	}
-
-	// Create and marshal command to execute.
-	cmdmsg := &execCommand{
-		Command:  ctx.ExecRequest.GetCommand(),
-		Username: ctx.Identity.TeleportUser,
-		Login:    ctx.Identity.Login,
-		Roles:    ctx.Identity.RoleSet.RoleNames(),
-		// If a term was allocated before (this means it was an exec request with an
-		// PTY explicitly allocated) or no command was given (which means an
-		// interactive session was requested), then make sure "teleport exec"
-		// executes through a PTY.
-		Terminal: ctx.termAllocated || ctx.ExecRequest.GetCommand() == "",
-		// Save off the SSH request type. This will be used to control where to
-		// connect std{out,err} based on the request type: "exec" or "shell".
-		RequestType:           ctx.request.Type,
-		PermitUserEnvironment: ctx.srv.PermitUserEnvironment(),
-		Environment:           buildEnvironment(ctx),
-		// PAM and ServiceName are used to pass PAM specific information to the
-		// child process.
-		PAM:         pamEnabled,
-		ServiceName: pamServiceName,
-	}
-	cmdbytes, err := json.Marshal(cmdmsg)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
-	// Write command bytes to pipe. The child process will read the command
-	// to execute from this pipe.
-	_, err = io.Copy(ctx.cmdw, bytes.NewReader(cmdbytes))
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	err = ctx.cmdw.Close()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	// Set to nil so the close in the context doesn't attempt to re-close.
-	ctx.cmdw = nil
-
-	// Find the Teleport executable and it's directory on disk.
-	executable, err := os.Executable()
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	executableDir, _ := filepath.Split(executable)
-
-	// Build the list of arguments to have Teleport re-exec itself. The "-d" flag
-	// is appended if Teleport is running in debug mode.
-	args := []string{executable, teleport.ExecSubCommand}
-
-	// Build the "teleport exec" command.
-	return &exec.Cmd{
-		Path: executable,
-		Args: args,
-		Dir:  executableDir,
-		ExtraFiles: []*os.File{
-			ctx.cmdr,
-			ctx.contr,
-		},
-	}, nil
 }
 
 // waitForContinue will wait 10 seconds for the continue signal, if not
