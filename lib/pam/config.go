@@ -34,7 +34,7 @@ type Config struct {
 	// ServiceName is the name of the policy to apply typically in /etc/pam.d/
 	ServiceName string
 
-	// Metadata is additional metadata about the user that Teleport stores in
+	// LoginContext is additional metadata about the user that Teleport stores in
 	// the PAM_RUSER field. It can be extracted by PAM modules like
 	// pam_script.so to configure the users environment.
 	LoginContext *LoginContextV1
@@ -75,7 +75,7 @@ func (c *Config) CheckDefaults() error {
 
 // LoginContextV1 is passed to PAM modules in the PAM_RUSER field.
 type LoginContextV1 struct {
-	// Version is the version of the metadata struct.
+	// Version is the version of this struct.
 	Version int `json:"version"`
 
 	// Username is the Teleport user (identity) that is attempting to login.
