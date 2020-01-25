@@ -34,9 +34,6 @@ type Config struct {
 	// ServiceName is the name of the policy to apply typically in /etc/pam.d/
 	ServiceName string
 
-	//// Username is the name of the target user.
-	//Username string
-
 	// Metadata is additional metadata about the user that Teleport stores in
 	// the PAM_RUSER field. It can be extracted by PAM modules like
 	// pam_script.so to configure the users environment.
