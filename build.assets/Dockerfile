@@ -9,6 +9,8 @@ COPY pam/pam_teleport.so /lib/x86_64-linux-gnu/security
 COPY pam/teleport-acct-failure /etc/pam.d
 COPY pam/teleport-session-failure /etc/pam.d
 COPY pam/teleport-success /etc/pam.d
+COPY pam/pam_ruser.so /lib/x86_64-linux-gnu/security
+COPY PAM/teleport-pam-ruser /etc/pam.d
 
 RUN apt-get update; apt-get install -q -y libpam-dev libc6-dev-i386 net-tools tree
 

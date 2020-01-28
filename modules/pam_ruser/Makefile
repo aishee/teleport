@@ -19,21 +19,19 @@ ifeq ($(UNAME),Darwin)
     LD_FLAGS = -lpam -shared
 endif
 
-all: pam_echo.so
+all: pam_ruser.so
 
 install:
 	mkdir -p $(PAM_MODULE_PATH)
-	cp pam_echo.so $(PAM_MODULE_PATH)
-	sudo cp policy/teleport-acct-failure $(PAM_POLICY_PATH)
-	sudo cp policy/teleport-session-failure $(PAM_POLICY_PATH)
-	sudo cp policy/teleport-success $(PAM_POLICY_PATH)
+	cp pam_ruser.so $(PAM_MODULE_PATH)
+	sudo cp policy/teleport-pam-ruser $(PAM_POLICY_PATH)
 
-pam_echo.so: pam_echo.o
-	$(LD) $(LD_FLAGS) -o pam_echo.so pam_echo.o
-	chmod 644 pam_echo.so
+pam_ruser.so: pam_ruser.o
+	$(LD) $(LD_FLAGS) -o pam_ruser.so pam_ruser.o
+	chmod 644 pam_ruser.so
 
-pam_echo.o: clean pam_echo.c
-	gcc -fPIC -c pam_echo.c
+pam_ruser.o: clean pam_ruser.c
+	gcc -fPIC -c pam_ruser.c
 
 clean:
-	rm -f pam_echo.o pam_echo.so
+	rm -f pam_ruser.o pam_ruser.so

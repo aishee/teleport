@@ -38,6 +38,10 @@ func (p *PAM) Close() error {
 	return nil
 }
 
+func (p *PAM) Environment() []string {
+    return nil
+}
+
 // BuildHasPAM returns true if the binary was build with support for PAM
 // compiled in.
 func BuildHasPAM() bool {

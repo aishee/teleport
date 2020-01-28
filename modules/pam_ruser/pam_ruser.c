@@ -12,6 +12,7 @@
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
+    pam_info(pamh, "--> Enter pam_sm_acct_mgmt.");
     int pam_err;
 	const char **login_context;
     pam_err = pam_get_item(pamh, PAM_RUSER, (const void **)login_context);
@@ -27,6 +28,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
+    pam_info(pamh, "--> Enter pam_sm_open_session.");
+
     int pam_err;
 	const char **login_context;
     pam_err = pam_get_item(pamh, PAM_RUSER, (const void **)login_context);
@@ -42,5 +45,7 @@ int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, const char **ar
 
 int pam_sm_close_session (pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
+    pam_info(pamh, "--> Enter pam_sm_close_session.");
+
     return PAM_SUCCESS;
 }
