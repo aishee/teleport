@@ -646,13 +646,13 @@ func (c *ServerContext) ExecCommand() (*execCommand, error) {
 		pamServiceName = conf.ServiceName
 	}
 
-    // If the identity has roles, extract the role names.
-    var roleNames []string
-    if len(c.Identity.RoleSet) > 0 {
-        roleNames = c.Identity.RoleSet.RoleNames()
-    }
+	// If the identity has roles, extract the role names.
+	var roleNames []string
+	if len(c.Identity.RoleSet) > 0 {
+		roleNames = c.Identity.RoleSet.RoleNames()
+	}
 
-    // Create the execCommand that will be send to the child process.
+	// Create the execCommand that will be send to the child process.
 	return &execCommand{
 		Command:               c.ExecRequest.GetCommand(),
 		Username:              c.Identity.TeleportUser,
@@ -664,7 +664,7 @@ func (c *ServerContext) ExecCommand() (*execCommand, error) {
 		Environment:           buildEnvironment(c),
 		PAM:                   pamEnabled,
 		ServiceName:           pamServiceName,
-        IsTestStub:            c.IsTestStub,
+		IsTestStub:            c.IsTestStub,
 	}, nil
 }
 

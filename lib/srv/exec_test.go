@@ -111,8 +111,8 @@ func (s *ExecSuite) SetUpSuite(c *check.C) {
 
 	s.usr, _ = user.Current()
 	s.ctx = &ServerContext{
-		IsTestStub: true,
-        ClusterName: "localhost",
+		IsTestStub:  true,
+		ClusterName: "localhost",
 		srv: &fakeServer{
 			accessPoint: s.a,
 			auditLog:    &fakeLog{},
@@ -160,8 +160,8 @@ func (s *ExecSuite) TestOSCommandPrep(c *check.C) {
 	}
 
 	// Empty command (simple shell).
-    execCmd, err := s.ctx.ExecCommand()
-    c.Assert(err, check.IsNil)
+	execCmd, err := s.ctx.ExecCommand()
+	c.Assert(err, check.IsNil)
 	cmd, err := buildCommand(execCmd, nil, nil, nil)
 	c.Assert(err, check.IsNil)
 	c.Assert(cmd, check.NotNil)
@@ -172,8 +172,8 @@ func (s *ExecSuite) TestOSCommandPrep(c *check.C) {
 
 	// Non-empty command (exec a prog).
 	s.ctx.ExecRequest.SetCommand("ls -lh /etc")
-    execCmd, err = s.ctx.ExecCommand()
-    c.Assert(err, check.IsNil)
+	execCmd, err = s.ctx.ExecCommand()
+	c.Assert(err, check.IsNil)
 	cmd, err = buildCommand(execCmd, nil, nil, nil)
 	c.Assert(err, check.IsNil)
 	c.Assert(cmd, check.NotNil)
@@ -184,8 +184,8 @@ func (s *ExecSuite) TestOSCommandPrep(c *check.C) {
 
 	// Command without args.
 	s.ctx.ExecRequest.SetCommand("top")
-    execCmd, err = s.ctx.ExecCommand()
-    c.Assert(err, check.IsNil)
+	execCmd, err = s.ctx.ExecCommand()
+	c.Assert(err, check.IsNil)
 	cmd, err = buildCommand(execCmd, nil, nil, nil)
 	c.Assert(err, check.IsNil)
 	c.Assert(cmd.Path, check.Equals, "/bin/sh")

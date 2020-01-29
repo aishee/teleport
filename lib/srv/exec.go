@@ -430,11 +430,11 @@ func (e *localExec) transformSecureCopy() error {
 // function is used by Teleport to re-execute itself and pass whatever data
 // is need to the child to actually execute the shell.
 func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
-    // Marshal the parts needed from the *ServerContext into a *execCommand.
-    cmdmsg, err := ctx.ExecCommand()
-    if err != nil {
+	// Marshal the parts needed from the *ServerContext into a *execCommand.
+	cmdmsg, err := ctx.ExecCommand()
+	if err != nil {
 		return nil, trace.Wrap(err)
-    }
+	}
 	cmdbytes, err := json.Marshal(cmdmsg)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -551,8 +551,8 @@ func buildCommand(c *execCommand, tty *os.File, pty *os.File, pamEnvironment []s
 		"SHELL=" + shellPath,
 	}
 
-    // Add in Teleport specific environment variables.
-    cmd.Env = append(cmd.Env, c.Environment...)
+	// Add in Teleport specific environment variables.
+	cmd.Env = append(cmd.Env, c.Environment...)
 
 	// If the server allows reading in of ~/.tsh/environment read it in
 	// and pass environment variables along to new session.

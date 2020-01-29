@@ -18,9 +18,9 @@ package lite
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
-    "fmt"
 
 	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/backend/test"
