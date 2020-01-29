@@ -2767,9 +2767,6 @@ func (s *IntSuite) TestPAM(c *check.C) {
 	// install the pam_teleport.so module by running 'make && sudo make install'
 	// from the modules/pam_teleport directory. This will install the PAM module
 	// as well as the policy files.
-	fmt.Printf("--> pam.BuildHasPAM: %v.\n", pam.BuildHasPAM())
-	fmt.Printf("--> pam.SystemHasPAM: %v.\n", pam.SystemHasPAM())
-	fmt.Printf("--> hasPAMPolicy: %v.\n", hasPAMPolicy())
 	if !pam.BuildHasPAM() || !pam.SystemHasPAM() || !hasPAMPolicy() {
 		skipMessage := "Skipping TestPAM: no policy found. To run PAM tests run " +
 			"'make && sudo make install' from the modules/pam_teleport directory."
@@ -2781,34 +2778,27 @@ func (s *IntSuite) TestPAM(c *check.C) {
 		inServiceName string
 		outContains   []string
 	}{
-		//// 0 - No PAM support, session should work but no PAM related output.
-		//{
-		//	inEnabled:     true,
-		//	inServiceName: "teleport-pam-ruser",
-		//	outContains:   []string{},
-		//},
-
-		//// 0 - No PAM support, session should work but no PAM related output.
-		//{
-		//	inEnabled:     false,
-		//	inServiceName: "",
-		//	outContains:   []string{},
-		//},
-		//// 1 - PAM enabled, module account and session functions return success.
-		//{
-		//	inEnabled:     true,
-		//	inServiceName: "teleport-success",
-		//	outContains: []string{
-		//		"Account opened successfully.",
-		//		"Session open successfully.",
-		//	},
-		//},
-		//// 2 - PAM enabled, module account functions fail.
-		//{
-		//	inEnabled:     true,
-		//	inServiceName: "teleport-acct-failure",
-		//	outContains:   []string{},
-		//},
+		// 0 - No PAM support, session should work but no PAM related output.
+		{
+			inEnabled:     false,
+			inServiceName: "",
+			outContains:   []string{},
+		},
+		// 1 - PAM enabled, module account and session functions return success.
+		{
+			inEnabled:     true,
+			inServiceName: "teleport-success",
+			outContains: []string{
+				"Account opened successfully.",
+				"Session open successfully.",
+			},
+		},
+		// 2 - PAM enabled, module account functions fail.
+		{
+			inEnabled:     true,
+			inServiceName: "teleport-acct-failure",
+			outContains:   []string{},
+		},
 		// 3 - PAM enabled, module session functions fail.
 		{
 			inEnabled:     true,
@@ -2842,7 +2832,6 @@ func (s *IntSuite) TestPAM(c *check.C) {
 		// Create an interactive session and write something to the terminal.
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
-			fmt.Printf("--> s.me.Username: %v.\n", s.me.Username)
 			cl, err := t.NewClient(ClientConfig{
 				Login:   s.me.Username,
 				Cluster: Site,
@@ -2868,14 +2857,13 @@ func (s *IntSuite) TestPAM(c *check.C) {
 		case <-ctx.Done():
 		}
 
-		fmt.Printf("--> %v.", string(termSession.Output(100)))
-		//// If any output is expected, check to make sure it was output.
-		//if len(tt.outContains) > 0 {
-		//	for _, expectedOutput := range tt.outContains {
-		//		output := string(termSession.Output(100))
-		//		c.Assert(strings.Contains(output, expectedOutput), check.Equals, true)
-		//	}
-		//}
+		// If any output is expected, check to make sure it was output.
+		if len(tt.outContains) > 0 {
+			for _, expectedOutput := range tt.outContains {
+				output := string(termSession.Output(100))
+				c.Assert(strings.Contains(output, expectedOutput), check.Equals, true)
+			}
+		}
 	}
 }
 
@@ -4340,6 +4328,7 @@ func (t *Terminal) Read(p []byte) (n int, err error) {
 		time.Sleep(time.Millisecond * 10)
 	}
 	return n, nil
+
 }
 
 // waitFor helper waits on a challen for up to the given timeout
@@ -4357,10 +4346,10 @@ func waitFor(c chan interface{}, timeout time.Duration) error {
 // they do it returns true, otherwise returns false.
 func hasPAMPolicy() bool {
 	pamPolicyFiles := []string{
+		"/etc/pam.d/teleport-session-echo-ruser",
 		"/etc/pam.d/teleport-acct-failure",
 		"/etc/pam.d/teleport-session-failure",
 		"/etc/pam.d/teleport-success",
-		"/etc/pam.d/teleport-pam-ruser",
 	}
 
 	for _, fileName := range pamPolicyFiles {
