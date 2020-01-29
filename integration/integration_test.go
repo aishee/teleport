@@ -4328,7 +4328,6 @@ func (t *Terminal) Read(p []byte) (n int, err error) {
 		time.Sleep(time.Millisecond * 10)
 	}
 	return n, nil
-
 }
 
 // waitFor helper waits on a challen for up to the given timeout
@@ -4346,7 +4345,6 @@ func waitFor(c chan interface{}, timeout time.Duration) error {
 // they do it returns true, otherwise returns false.
 func hasPAMPolicy() bool {
 	pamPolicyFiles := []string{
-		"/etc/pam.d/teleport-session-echo-ruser",
 		"/etc/pam.d/teleport-acct-failure",
 		"/etc/pam.d/teleport-session-failure",
 		"/etc/pam.d/teleport-success",
