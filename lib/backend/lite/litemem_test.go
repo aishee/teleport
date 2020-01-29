@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 	"time"
+    "fmt"
 
 	"github.com/gravitational/teleport/lib/backend"
 	"github.com/gravitational/teleport/lib/backend/test"
@@ -34,6 +35,8 @@ type LiteMemSuite struct {
 }
 
 var _ = check.Suite(&LiteMemSuite{})
+var _ = testing.Verbose
+var _ = fmt.Printf
 
 func (s *LiteMemSuite) SetUpSuite(c *check.C) {
 	utils.InitLoggerForTests(testing.Verbose())

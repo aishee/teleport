@@ -430,33 +430,11 @@ func (e *localExec) transformSecureCopy() error {
 // function is used by Teleport to re-execute itself and pass whatever data
 // is need to the child to actually execute the shell.
 func configureCommand(ctx *ServerContext) (*exec.Cmd, error) {
-	var err error
-	var pamEnabled bool
-	var pamServiceName string
-
-	// If this code is running on a node, check if PAM is enabled or not.
-	if ctx.srv.Component() == teleport.ComponentNode {
-		conf, err := ctx.srv.GetPAM()
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		pamEnabled = conf.Enabled
-		pamServiceName = conf.ServiceName
-	}
-
-	// Create and marshal command to execute.
-	cmdmsg := &execCommand{
-		Command:               ctx.ExecRequest.GetCommand(),
-		Username:              ctx.Identity.TeleportUser,
-		Login:                 ctx.Identity.Login,
-		Roles:                 ctx.Identity.RoleSet.RoleNames(),
-		Terminal:              ctx.termAllocated || ctx.ExecRequest.GetCommand() == "",
-		RequestType:           ctx.request.Type,
-		PermitUserEnvironment: ctx.srv.PermitUserEnvironment(),
-		Environment:           buildEnvironment(ctx),
-		PAM:                   pamEnabled,
-		ServiceName:           pamServiceName,
-	}
+    // Marshal the parts needed from the *ServerContext into a *execCommand.
+    cmdmsg, err := ctx.ExecCommand()
+    if err != nil {
+		return nil, trace.Wrap(err)
+    }
 	cmdbytes, err := json.Marshal(cmdmsg)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -564,7 +542,7 @@ func buildCommand(c *execCommand, tty *os.File, pty *os.File, pamEnvironment []s
 		cmd.Args = []string{shellPath, "-c", c.Command}
 	}
 
-	// Create environment for user.
+	// Create default environment for user.
 	cmd.Env = []string{
 		"LANG=en_US.UTF-8",
 		getDefaultEnvPath(localUser.Uid, defaultLoginDefsPath),
@@ -572,6 +550,9 @@ func buildCommand(c *execCommand, tty *os.File, pty *os.File, pamEnvironment []s
 		"USER=" + c.Login,
 		"SHELL=" + shellPath,
 	}
+
+    // Add in Teleport specific environment variables.
+    cmd.Env = append(cmd.Env, c.Environment...)
 
 	// If the server allows reading in of ~/.tsh/environment read it in
 	// and pass environment variables along to new session.

@@ -630,6 +630,44 @@ func (c *ServerContext) String() string {
 	return fmt.Sprintf("ServerContext(%v->%v, user=%v, id=%v)", c.Conn.RemoteAddr(), c.Conn.LocalAddr(), c.Conn.User(), c.id)
 }
 
+// ExecCommand takes a *ServerContext and extracts the parts needed to create
+// an *execCommand which can be re-sent to Teleport.
+func (c *ServerContext) ExecCommand() (*execCommand, error) {
+	var pamEnabled bool
+	var pamServiceName string
+
+	// If this code is running on a node, check if PAM is enabled or not.
+	if c.srv.Component() == teleport.ComponentNode {
+		conf, err := c.srv.GetPAM()
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		pamEnabled = conf.Enabled
+		pamServiceName = conf.ServiceName
+	}
+
+    // If the identity has roles, extract the role names.
+    var roleNames []string
+    if len(c.Identity.RoleSet) > 0 {
+        roleNames = c.Identity.RoleSet.RoleNames()
+    }
+
+    // Create the execCommand that will be send to the child process.
+	return &execCommand{
+		Command:               c.ExecRequest.GetCommand(),
+		Username:              c.Identity.TeleportUser,
+		Login:                 c.Identity.Login,
+		Roles:                 roleNames,
+		Terminal:              c.termAllocated || c.ExecRequest.GetCommand() == "",
+		RequestType:           c.request.Type,
+		PermitUserEnvironment: c.srv.PermitUserEnvironment(),
+		Environment:           buildEnvironment(c),
+		PAM:                   pamEnabled,
+		ServiceName:           pamServiceName,
+        IsTestStub:            c.IsTestStub,
+	}, nil
+}
+
 func closeAll(closers ...io.Closer) error {
 	var errs []error
 
