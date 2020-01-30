@@ -18,6 +18,7 @@ package pam
 
 import (
     "bytes"
+    "os/user"
     "encoding/json"
     "fmt"
     "testing"
@@ -41,49 +42,72 @@ func (s *Suite) TearDownSuite(c *check.C) {}
 func (s *Suite) SetUpTest(c *check.C)     {}
 func (s *Suite) TearDownTest(c *check.C)  {}
 
+// TestEcho makes sure that the PAM_RUSER variable passed to a PAM module
+// is correctly set
+//
+// The PAM module used, pam_teleport.so is called from the policy file
+// teleport-session-echo-ruser. The policy file instructs pam_teleport.so to
+// echo the contents of PAM_RUSER to stdout where this test can read, parse,
+// and validate it's output.
 func (s *Suite) TestEcho(c *check.C) {
-    var buf bytes.Buffer
-
+    // Skip this test if the binary was not build with PAM support.
     if !BuildHasPAM() || !SystemHasPAM() {
         c.Skip("Skipping test: PAM support not enabled.")
     }
 
+    local, err := user.Current()
+    c.Assert(err, check.IsNil)
+
+    var buf bytes.Buffer
     pamContext, err := Open(&Config{
         Enabled:     true,
         ServiceName: "teleport-session-echo-ruser",
         LoginContext: &LoginContextV1{
             Version:  1,
             Username: "foo",
-            Login:    "bar",
+            Login:    local.Username,
             Roles:    []string{"baz", "qux"},
         },
         Stdin:  &discardReader{},
         Stdout: &buf,
         Stderr: &buf,
     })
-    defer pamContext.Close()
     c.Assert(err, check.IsNil)
+    defer pamContext.Close()
 
     var context LoginContextV1
     err = json.Unmarshal(buf.Bytes(), &context)
     c.Assert(err, check.IsNil)
 
     c.Assert(context.Username, check.Equals, "foo")
-    c.Assert(context.Login, check.Equals, "bar")
+    c.Assert(context.Login, check.Equals, local.Username)
     c.Assert(context.Roles, check.DeepEquals, []string{"baz", "qux"})
 }
 
+// TestEnvironment makes sure that PAM environment variables (environment
+// variables set by a PAM module) can be accessed from the PAM handle/context
+// in Go code.
+//
+// The PAM module used, pam_teleport.so is called from the policy file
+// teleport-session-environment. The policy file instructs pam_teleport.so to
+// read in the first argument and set it as a PAM environment variaable. This
+// test then validates it matches what was set in the policy file.
 func (s *Suite) TestEnvironment(c *check.C) {
-    var buf bytes.Buffer
-
+    // Skip this test if the binary was not build with PAM support.
     if !BuildHasPAM() || !SystemHasPAM() {
         c.Skip("Skipping test: PAM support not enabled.")
     }
 
+    local, err := user.Current()
+    c.Assert(err, check.IsNil)
+
+    var buf bytes.Buffer
     pamContext, err := Open(&Config{
         Enabled:      true,
         ServiceName:  "teleport-session-environment",
-        LoginContext: &LoginContextV1{},
+        LoginContext: &LoginContextV1{
+            Login: local.Username,
+        },
         Stdin:        &discardReader{},
         Stdout:       &buf,
         Stderr:       &buf,
