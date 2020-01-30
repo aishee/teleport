@@ -44,7 +44,6 @@ import "C"
 
 import (
 	"bufio"
-    "fmt"
 	"io"
 	"strings"
 	"sync"
@@ -414,8 +413,6 @@ func (p *PAM) codeToError(returnValue C.int) error {
 	// Error strings are not allocated on the heap, so memory does not need
 	// released.
 	err := C._pam_strerror(pamHandle, p.pamh, returnValue)
-    fmt.Printf("--> codeToError: %v.\n", err)
-    fmt.Printf("--> codeToError: %v.\n", C.GoString(err))
 	if err != nil {
 		return trace.BadParameter(C.GoString(err))
 	}

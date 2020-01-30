@@ -17,15 +17,15 @@ limitations under the License.
 package pam
 
 import (
-    "bytes"
-    "os/user"
-    "encoding/json"
-    "fmt"
-    "testing"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os/user"
+	"testing"
 
-    "github.com/gravitational/teleport/lib/utils"
+	"github.com/gravitational/teleport/lib/utils"
 
-    "gopkg.in/check.v1"
+	"gopkg.in/check.v1"
 )
 
 type Suite struct{}
@@ -36,7 +36,7 @@ var _ = check.Suite(&Suite{})
 func TestPAM(t *testing.T) { check.TestingT(t) }
 
 func (s *Suite) SetUpSuite(c *check.C) {
-    utils.InitLoggerForTests()
+	utils.InitLoggerForTests()
 }
 func (s *Suite) TearDownSuite(c *check.C) {}
 func (s *Suite) SetUpTest(c *check.C)     {}
@@ -50,38 +50,37 @@ func (s *Suite) TearDownTest(c *check.C)  {}
 // echo the contents of PAM_RUSER to stdout where this test can read, parse,
 // and validate it's output.
 func (s *Suite) TestEcho(c *check.C) {
-    // Skip this test if the binary was not build with PAM support.
-    if !BuildHasPAM() || !SystemHasPAM() {
-        c.Skip("Skipping test: PAM support not enabled.")
-    }
+	// Skip this test if the binary was not build with PAM support.
+	if !BuildHasPAM() || !SystemHasPAM() {
+		c.Skip("Skipping test: PAM support not enabled.")
+	}
 
-    local, err := user.Current()
-    c.Assert(err, check.IsNil)
+	local, err := user.Current()
+	c.Assert(err, check.IsNil)
 
-    var buf bytes.Buffer
-    pamContext, err := Open(&Config{
-        Enabled:     true,
-        ServiceName: "teleport-session-echo-ruser",
-        LoginContext: &LoginContextV1{
-            Version:  1,
-            Username: "foo",
-            Login:    local.Username,
-            Roles:    []string{"baz", "qux"},
-        },
-        Stdin:  &discardReader{},
-        Stdout: &buf,
-        Stderr: &buf,
-    })
-    c.Assert(err, check.IsNil)
-    defer pamContext.Close()
+	var buf bytes.Buffer
+	_, err = Open(&Config{
+		Enabled:     true,
+		ServiceName: "teleport-session-echo-ruser",
+		LoginContext: &LoginContextV1{
+			Version:  1,
+			Username: "foo",
+			Login:    local.Username,
+			Roles:    []string{"baz", "qux"},
+		},
+		Stdin:  &discardReader{},
+		Stdout: &buf,
+		Stderr: &buf,
+	})
+	c.Assert(err, check.IsNil)
 
-    var context LoginContextV1
-    err = json.Unmarshal(buf.Bytes(), &context)
-    c.Assert(err, check.IsNil)
+	var context LoginContextV1
+	err = json.Unmarshal(buf.Bytes(), &context)
+	c.Assert(err, check.IsNil)
 
-    c.Assert(context.Username, check.Equals, "foo")
-    c.Assert(context.Login, check.Equals, local.Username)
-    c.Assert(context.Roles, check.DeepEquals, []string{"baz", "qux"})
+	c.Assert(context.Username, check.Equals, "foo")
+	c.Assert(context.Login, check.Equals, local.Username)
+	c.Assert(context.Roles, check.DeepEquals, []string{"baz", "qux"})
 }
 
 // TestEnvironment makes sure that PAM environment variables (environment
@@ -93,35 +92,34 @@ func (s *Suite) TestEcho(c *check.C) {
 // read in the first argument and set it as a PAM environment variaable. This
 // test then validates it matches what was set in the policy file.
 func (s *Suite) TestEnvironment(c *check.C) {
-    // Skip this test if the binary was not build with PAM support.
-    if !BuildHasPAM() || !SystemHasPAM() {
-        c.Skip("Skipping test: PAM support not enabled.")
-    }
+	// Skip this test if the binary was not build with PAM support.
+	if !BuildHasPAM() || !SystemHasPAM() {
+		c.Skip("Skipping test: PAM support not enabled.")
+	}
 
-    local, err := user.Current()
-    c.Assert(err, check.IsNil)
+	local, err := user.Current()
+	c.Assert(err, check.IsNil)
 
-    var buf bytes.Buffer
-    pamContext, err := Open(&Config{
-        Enabled:      true,
-        ServiceName:  "teleport-session-environment",
-        LoginContext: &LoginContextV1{
-            Login: local.Username,
-        },
-        Stdin:        &discardReader{},
-        Stdout:       &buf,
-        Stderr:       &buf,
-    })
-    defer pamContext.Close()
-    c.Assert(err, check.IsNil)
+	var buf bytes.Buffer
+	pamContext, err := Open(&Config{
+		Enabled:     true,
+		ServiceName: "teleport-session-environment",
+		LoginContext: &LoginContextV1{
+			Login: local.Username,
+		},
+		Stdin:  &discardReader{},
+		Stdout: &buf,
+		Stderr: &buf,
+	})
+	c.Assert(err, check.IsNil)
 
-    c.Assert(pamContext.Environment(), check.HasLen, 1)
-    c.Assert(pamContext.Environment()[0], check.Equals, "foo=bar")
+	c.Assert(pamContext.Environment(), check.HasLen, 1)
+	c.Assert(pamContext.Environment()[0], check.Equals, "foo=bar")
 }
 
 type discardReader struct {
 }
 
 func (d *discardReader) Read(p []byte) (int, error) {
-    return len(p), nil
+	return len(p), nil
 }
