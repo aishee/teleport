@@ -131,6 +131,11 @@ func (s *DynamicAccessService) GetAccessRequests(ctx context.Context, filter ser
 	if filter.ID != "" {
 		req, err := s.GetAccessRequest(ctx, filter.ID)
 		if err != nil {
+			// A filter with zero matches is still a success, it just
+			// happens to return an empty slice.
+			if trace.IsNotFound(err) {
+				return nil, nil
+			}
 			return nil, trace.Wrap(err)
 		}
 		if !filter.Match(req) {
@@ -157,9 +162,6 @@ func (s *DynamicAccessService) GetAccessRequests(ctx context.Context, filter ser
 			continue
 		}
 		requests = append(requests, req)
-	}
-	if len(requests) == 0 {
-		return nil, trace.NotFound("no matching access requests")
 	}
 	return requests, nil
 }
@@ -214,6 +216,11 @@ func (s *DynamicAccessService) getAccessRequestPluginData(ctx context.Context, f
 	if filter.Resource != "" {
 		item, err := s.Get(ctx, pluginDataKey(services.KindAccessRequest, filter.Resource))
 		if err != nil {
+			// A filter with zero matches is still a success, it just
+			// happens to return an empty slice.
+			if trace.IsNotFound(err) {
+				return nil, nil
+			}
 			return nil, trace.Wrap(err)
 		}
 		data, err := itemToPluginData(*item)
@@ -245,9 +252,6 @@ func (s *DynamicAccessService) getAccessRequestPluginData(ctx context.Context, f
 			continue
 		}
 		matches = append(matches, data)
-	}
-	if len(matches) == 0 {
-		return nil, trace.NotFound("no matching plugin data")
 	}
 	return matches, nil
 }
